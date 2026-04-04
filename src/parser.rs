@@ -1,52 +1,5 @@
-use std::fmt::Display;
-
+use crate::ast;
 use crate::tokenizer::{self, Span, Token, TokenKind, Tokenizer};
-
-#[derive(Debug)]
-pub struct Ident<'src> {
-    pub ident: &'src str,
-    pub span: Span,
-}
-
-#[derive(Debug)]
-pub enum LambdaTerm<'src> {
-    Variable(Ident<'src>),
-    Abstraction {
-        parameter: Ident<'src>,
-        body: Box<LambdaTerm<'src>>,
-        head_span: Span,
-        span: Span,
-    },
-    Application {
-        function: Box<LambdaTerm<'src>>,
-        argument: Box<LambdaTerm<'src>>,
-        span: Span,
-    },
-}
-
-impl<'src> LambdaTerm<'src> {
-    fn span(&self) -> Span {
-        match self {
-            LambdaTerm::Variable(ident) => ident.span,
-            LambdaTerm::Abstraction { span, .. } => *span,
-            LambdaTerm::Application { span, .. } => *span,
-        }
-    }
-}
-
-impl<'src> Display for LambdaTerm<'src> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LambdaTerm::Variable(var) => write!(f, "{}", var.ident),
-            LambdaTerm::Abstraction {
-                parameter, body, ..
-            } => write!(f, "λ{}.{}", parameter.ident, body),
-            LambdaTerm::Application {
-                function, argument, ..
-            } => write!(f, "({}){}", function, argument),
-        }
-    }
-}
 
 #[derive(Debug)]
 enum Section<'src> {
@@ -81,11 +34,14 @@ impl<'src> Parser<'src> {
         Self { tokenizer }
     }
 
-    pub fn parse(&mut self) -> Result<LambdaTerm<'src>, Error<'src>> {
+    pub fn parse(&mut self) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
         self.parse_section(Section::Eof)
     }
 
-    fn parse_section(&mut self, section: Section<'src>) -> Result<LambdaTerm<'src>, Error<'src>> {
+    fn parse_section(
+        &mut self,
+        section: Section<'src>,
+    ) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
         let mut terms = Vec::new();
         loop {
             let token = self.tokenizer.take_token()?;
@@ -98,7 +54,7 @@ impl<'src> Parser<'src> {
             }
 
             let term = match token.kind {
-                TokenKind::Ident(ident) => LambdaTerm::Variable(Ident {
+                TokenKind::Ident(ident) => ast::LambdaTerm::Variable(ast::Ident {
                     ident: ident,
                     span: token.span,
                 }),
@@ -117,7 +73,7 @@ impl<'src> Parser<'src> {
 
         Ok(terms
             .into_iter()
-            .reduce(|lhs, rhs| LambdaTerm::Application {
+            .reduce(|lhs, rhs| ast::LambdaTerm::Application {
                 span: Span {
                     start: lhs.span().start,
                     end: lhs.span().end,
@@ -132,10 +88,10 @@ impl<'src> Parser<'src> {
         &mut self,
         section: Section<'src>,
         lambda_token: &Token<'src>,
-    ) -> Result<LambdaTerm<'src>, Error<'src>> {
+    ) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
         let parameter = self.tokenizer.take_token()?;
         let parameter = match &parameter.kind {
-            TokenKind::Ident(ident) => Ident {
+            TokenKind::Ident(ident) => ast::Ident {
                 ident,
                 span: parameter.span,
             },
@@ -154,7 +110,7 @@ impl<'src> Parser<'src> {
             end: body.span().end,
         };
 
-        Ok(LambdaTerm::Abstraction {
+        Ok(ast::LambdaTerm::Abstraction {
             parameter,
             body: Box::new(body),
             head_span: Span {
