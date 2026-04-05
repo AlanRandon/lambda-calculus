@@ -57,6 +57,7 @@ impl<'src> Parser<'src> {
                 TokenKind::Ident(ident) => ast::LambdaTerm::Variable(ast::Ident {
                     ident: ident,
                     span: token.span,
+                    renamings: 0,
                 }),
                 TokenKind::LParen => self.parse_section(Section::Paren { start: token })?,
                 TokenKind::Lambda => {
@@ -94,6 +95,7 @@ impl<'src> Parser<'src> {
             TokenKind::Ident(ident) => ast::Ident {
                 ident,
                 span: parameter.span,
+                renamings: 0,
             },
             _ => return Err(Error::UnexpectedToken(parameter)),
         };

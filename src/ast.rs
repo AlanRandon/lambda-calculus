@@ -5,6 +5,18 @@ use std::fmt::Display;
 pub struct Ident<'src> {
     pub ident: &'src str,
     pub span: Span,
+    pub renamings: usize,
+}
+
+impl<'src> Ident<'src> {
+    pub fn name(&self) -> Name<'src> {
+        Name::Ident(self.ident, self.renamings)
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum Name<'src> {
+    Ident(&'src str, usize),
 }
 
 #[derive(Debug, Clone)]
