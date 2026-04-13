@@ -8,6 +8,12 @@ pub enum TokenKind<'src> {
     LParen,
     /// ")"
     RParen,
+    /// "let"
+    Let,
+    /// "="
+    Equals,
+    /// "in"
+    In,
     Ident(&'src str),
     Eof,
 }
@@ -73,17 +79,28 @@ impl<'src> Tokenizer<'src> {
             });
         }
 
-        let token = Token {
-            kind: TokenKind::Ident(
-                str::from_utf8(&self.source[self.position..self.position + length]).unwrap(),
-            ),
-            span: Span {
-                start: SourcePosition(self.position),
-                end: SourcePosition(self.position + length - 1),
-            },
+        let ident = str::from_utf8(&self.source[self.position..self.position + length]).unwrap();
+        let span = Span {
+            start: SourcePosition(self.position),
+            end: SourcePosition(self.position + length - 1),
         };
 
         self.position += length;
+
+        let token = match ident {
+            "let" => Token {
+                kind: TokenKind::Let,
+                span,
+            },
+            "in" => Token {
+                kind: TokenKind::In,
+                span,
+            },
+            _ => Token {
+                kind: TokenKind::Ident(ident),
+                span,
+            },
+        };
 
         Ok(token)
     }
@@ -117,6 +134,18 @@ impl<'src> Tokenizer<'src> {
             b'.' => TokenKind::Dot,
             b'(' => TokenKind::LParen,
             b')' => TokenKind::RParen,
+            b'=' => TokenKind::Equals,
+            b'/' if self.source.get(self.position + 1) == Some(&b'/') => {
+                let length = self
+                    .source
+                    .get(self.position..)
+                    .expect("at least comment char in comment")
+                    .iter()
+                    .position(|ch| *ch == b'\n')
+                    .unwrap_or_else(|| self.source.len());
+                self.position += length;
+                return self.take_token();
+            }
             byte if byte.is_ascii_whitespace() => {
                 self.position += 1;
                 return self.take_token();

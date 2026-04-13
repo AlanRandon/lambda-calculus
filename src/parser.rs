@@ -2,16 +2,18 @@ use crate::ast;
 use crate::tokenizer::{self, Span, Token, TokenKind, Tokenizer};
 
 #[derive(Debug)]
-enum Section<'src> {
+enum Section {
     Eof,
-    Paren { start: Token<'src> },
+    Paren,
+    LetDeclaration,
 }
 
-impl<'src> Section<'src> {
+impl<'src> Section {
     fn closed_by_token(&self, token: &Token<'src>) -> bool {
         match self {
             Self::Eof => token.kind == TokenKind::Eof,
-            Self::Paren { .. } => token.kind == TokenKind::RParen,
+            Self::Paren => token.kind == TokenKind::RParen,
+            Self::LetDeclaration => token.kind == TokenKind::In,
         }
     }
 }
@@ -38,10 +40,7 @@ impl<'src> Parser<'src> {
         self.parse_section(Section::Eof)
     }
 
-    fn parse_section(
-        &mut self,
-        section: Section<'src>,
-    ) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
+    fn parse_section(&mut self, section: Section) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
         let mut terms = Vec::new();
         loop {
             let token = self.tokenizer.take_token()?;
@@ -59,13 +58,21 @@ impl<'src> Parser<'src> {
                     span: token.span,
                     renamings: 0,
                 }),
-                TokenKind::LParen => self.parse_section(Section::Paren { start: token })?,
+                TokenKind::LParen => self.parse_section(Section::Paren)?,
                 TokenKind::Lambda => {
                     terms.push(self.parse_abstraction(section, &token)?);
                     break;
                 }
-                TokenKind::Dot | TokenKind::Eof | TokenKind::RParen => {
+                TokenKind::Dot
+                | TokenKind::Eof
+                | TokenKind::RParen
+                | TokenKind::Equals
+                | TokenKind::In => {
                     return Err(Error::UnexpectedToken(token));
+                }
+                TokenKind::Let => {
+                    terms.push(self.parse_let(section, token)?);
+                    break;
                 }
             };
 
@@ -87,7 +94,7 @@ impl<'src> Parser<'src> {
 
     fn parse_abstraction(
         &mut self,
-        section: Section<'src>,
+        section: Section,
         lambda_token: &Token<'src>,
     ) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
         let parameter = self.tokenizer.take_token()?;
@@ -120,6 +127,53 @@ impl<'src> Parser<'src> {
                 end: dot.span.end,
             },
             span,
+        })
+    }
+
+    fn parse_let(
+        &mut self,
+        section: Section,
+        let_token: Token<'src>,
+    ) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
+        let binding = self.tokenizer.take_token()?;
+        let binding = match &binding.kind {
+            TokenKind::Ident(ident) => ast::Ident {
+                ident,
+                span: binding.span,
+                renamings: 0,
+            },
+            _ => return Err(Error::UnexpectedToken(binding)),
+        };
+
+        let equals = self.tokenizer.take_token()?;
+        match equals.kind {
+            TokenKind::Equals => {}
+            _ => return Err(Error::UnexpectedToken(equals)),
+        }
+
+        let value = self.parse_section(Section::LetDeclaration)?;
+        let body = self.parse_section(section)?;
+
+        // `let x = y in z` -> `(λx.z)y`
+
+        Ok(ast::LambdaTerm::Application {
+            span: Span {
+                start: let_token.span.start,
+                end: body.span().end,
+            },
+            function: Box::new(ast::LambdaTerm::Abstraction {
+                parameter: binding,
+                span: Span {
+                    start: let_token.span.start,
+                    end: body.span().end,
+                },
+                body: Box::new(body),
+                head_span: Span {
+                    start: let_token.span.start,
+                    end: value.span().end,
+                },
+            }),
+            argument: Box::new(value),
         })
     }
 }

@@ -157,6 +157,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tokenizer = Tokenizer::new(src);
     let mut parser = Parser::new(tokenizer);
     let term = parser.parse()?;
-    println!("{} → {}", term.to_string(), term.reduce_normal());
+    println!("parsed:\n{}", term.to_string());
+    println!("reduced:\n{}", term.reduce_normal());
     Ok(())
 }
