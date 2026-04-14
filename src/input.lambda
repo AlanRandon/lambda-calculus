@@ -1,25 +1,35 @@
+let true = λa.λb.a in
+let false = λa.λb.b in
+let if = λcondition.λthen.λelse.condition then else in
+
 let 0 = λf.λx.x in
 // n → n + 1
 let succ = λn.λf.λx.f (n f x) in
-// n, m → n + m
+// add n m → n + m
 let add = λn.λm.n succ m in
-// n, m → n * m
+// mul n m → n * m
 let mul = λn.λm.n (add m) 0 in
-// a, b → (a, b)
+// pair a b → (a, b)
 let pair = λa.λb.λz.z a b in
-// (a, b) → a
+// left (a, b) → a
 let left = λp.p λa.λb.a in
-// (a, b) → b
+// right (a, b) → b
 let right = λp.p λa.λb.b in
-// (n, m) → (n + 1, n)
+// Φ (n, m) → (n + 1, n)
 let Φ = λp.pair (succ (left p)) (left p) in
-// n → n - 1
+// pred n → n - 1
 let pred = λn.right (n Φ (pair 0 0)) in
-// n, m → n - m
+// sub n m → n - m
 let sub = λn.λm.m pred n in
 
 let 1 = succ 0 in
 let 2 = succ 1 in
 let 3 = succ 2 in
 let 4 = succ 3 in
-mul 2 (pred 4)
+
+let is_zero = λn.λa.λb.n (λx.b) a in
+
+let Y = λf.(λx.f (x x)) (λx.f (x x)) in
+let factorial = Y λf.λn.if (is_zero n) 1 (mul n (f (pred n))) in
+
+factorial 4

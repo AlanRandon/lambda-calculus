@@ -69,7 +69,7 @@ impl<'src> Tokenizer<'src> {
         let length: usize = ident
             .valid()
             .chars()
-            .take_while(|ch| ch.is_alphanumeric())
+            .take_while(|ch| ch.is_alphanumeric() || *ch == '_')
             .map(|ch| ch.len_utf8())
             .sum();
 
