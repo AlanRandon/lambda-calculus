@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TokenKind<'src> {
     /// "λ"
     Lambda,
@@ -18,7 +18,7 @@ pub enum TokenKind<'src> {
     Eof,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Token<'src> {
     pub kind: TokenKind<'src>,
     pub span: Span,
@@ -42,7 +42,7 @@ pub struct Tokenizer<'src> {
 #[derive(Debug, thiserror::Error)]
 #[error("invalid token at position {}", position.0)]
 pub struct InvalidTokenError {
-    position: SourcePosition,
+    pub position: SourcePosition,
 }
 
 const LAMBDA_BYTES: [u8; 2] = const {
@@ -52,11 +52,15 @@ const LAMBDA_BYTES: [u8; 2] = const {
 };
 
 impl<'src> Tokenizer<'src> {
-    pub const fn new(source: &'src str) -> Self {
+    pub const fn from_bytes(source: &'src [u8]) -> Self {
         Self {
-            source: source.as_bytes(),
+            source,
             position: 0,
         }
+    }
+
+    pub const fn new(source: &'src str) -> Self {
+        Self::from_bytes(source.as_bytes())
     }
 
     pub fn take_ident(&mut self) -> Result<Token<'src>, InvalidTokenError> {

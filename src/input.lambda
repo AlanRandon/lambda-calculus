@@ -32,4 +32,4 @@ let is_zero = λn.λa.λb.n (λx.b) a in
 let Y = λf.(λx.f (x x)) (λx.f (x x)) in
 let factorial = Y λf.λn.if (is_zero n) 1 (mul n (f (pred n))) in
 
-factorial 4
+factorial 3

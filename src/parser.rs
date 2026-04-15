@@ -1,8 +1,8 @@
 use crate::ast;
 use crate::tokenizer::{self, Span, Token, TokenKind, Tokenizer};
 
-#[derive(Debug)]
-enum Section {
+#[derive(Debug, Clone)]
+pub enum Section {
     Eof,
     Paren,
     LetDeclaration,
@@ -29,6 +29,11 @@ pub enum Error<'src> {
     InvalidToken(#[from] tokenizer::InvalidTokenError),
     #[error("unexpected token: {0:?}")]
     UnexpectedToken(Token<'src>),
+    #[error("error parsing section")]
+    Section {
+        open_token: Token<'src>,
+        error: Box<Error<'src>>,
+    },
 }
 
 impl<'src> Parser<'src> {
@@ -37,10 +42,25 @@ impl<'src> Parser<'src> {
     }
 
     pub fn parse(&mut self) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
-        self.parse_section(Section::Eof)
+        self.parse_section_inner(Section::Eof)
     }
 
-    fn parse_section(&mut self, section: Section) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
+    fn parse_section(
+        &mut self,
+        section: Section,
+        open_token: Token<'src>,
+    ) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
+        self.parse_section_inner(section.clone())
+            .map_err(|err| Error::Section {
+                open_token,
+                error: Box::new(err),
+            })
+    }
+
+    fn parse_section_inner(
+        &mut self,
+        section: Section,
+    ) -> Result<ast::LambdaTerm<'src>, Error<'src>> {
         let mut terms = Vec::new();
         loop {
             let token = self.tokenizer.take_token()?;
@@ -58,7 +78,7 @@ impl<'src> Parser<'src> {
                     span: token.span,
                     renamings: 0,
                 }),
-                TokenKind::LParen => self.parse_section(Section::Paren)?,
+                TokenKind::LParen => self.parse_section(Section::Paren, token)?,
                 TokenKind::Lambda => {
                     terms.push(self.parse_abstraction(section, &token)?);
                     break;
@@ -113,7 +133,7 @@ impl<'src> Parser<'src> {
             _ => return Err(Error::UnexpectedToken(dot)),
         }
 
-        let body = self.parse_section(section)?;
+        let body = self.parse_section_inner(section)?;
         let span = Span {
             start: lambda_token.span.start,
             end: body.span().end,
@@ -151,8 +171,8 @@ impl<'src> Parser<'src> {
             _ => return Err(Error::UnexpectedToken(equals)),
         }
 
-        let value = self.parse_section(Section::LetDeclaration)?;
-        let body = self.parse_section(section)?;
+        let value = self.parse_section(Section::LetDeclaration, let_token.clone())?;
+        let body = self.parse_section_inner(section)?;
 
         // `let x = y in z` -> `(λx.z)y`
 
